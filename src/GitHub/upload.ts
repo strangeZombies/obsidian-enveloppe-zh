@@ -412,13 +412,16 @@ export default class Publisher {
 			throw new Error("Config error : missing GitHub username in the plugin settings");
 		}
 		const octokit = this.octokit;
+		let message = `PUSH NOTE : ${title}`;
 		if (isAttachment(path, this.settings.embed.unHandledObsidianExt)) {
 			title = path.split("/")[path.split("/").length - 1];
+			message = `PUSH ATTACHMENT : ${title}`;
 		}
 		const result: UploadedFiles = {
 			isUpdated: false,
 			file: title,
 		};
+		let sha = "";
 		try {
 			const response = (await octokit.request(
 				"GET /repos/{owner}/{repo}/contents/{+path}",
@@ -430,19 +433,32 @@ export default class Publisher {
 				}
 			)) as { status: number; data: ContentFile };
 			if (response.status === 200 && response.data.type === "file") {
+				sha = response.data.sha;
 				result.isUpdated = true;
 			}
 		} catch {
 			this.console.trace(i18next.t("error.normal"));
 		}
 
-		this.commitBatch.stageFile(
-			prop.owner,
-			prop.repo,
-			this.branchName,
-			path,
-			content
-		);
+		if (this.settings.github.batchCommit) {
+			this.commitBatch.stageFile(
+				prop.owner,
+				prop.repo,
+				this.branchName,
+				path,
+				content
+			);
+		} else {
+			await octokit.request("PUT /repos/{owner}/{repo}/contents/{+path}", {
+				owner: prop.owner,
+				repo: prop.repo,
+				path,
+				message,
+				content,
+				sha,
+				branch: this.branchName,
+			});
+		}
 		return result;
 	}
 
@@ -457,7 +473,7 @@ export default class Publisher {
 	 * Commit all queued file changes for one target repository.
 	 */
 	async flushPendingChanges(prop: Properties): Promise<void> {
-		if (!prop.owner || !prop.repo) return;
+		if (!this.settings.github.batchCommit || !prop.owner || !prop.repo) return;
 		await this.commitBatch.commit(prop.owner, prop.repo, this.branchName);
 	}
 

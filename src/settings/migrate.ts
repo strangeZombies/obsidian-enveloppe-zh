@@ -331,6 +331,7 @@ async function migrateOldSettings(plugin: Enveloppe, old: OldSettings) {
 					: "",
 			branch: old.githubBranch,
 			automaticallyMergePR: old.automaticallyMergePR,
+			batchCommit: plugin.settings.github.batchCommit ?? true,
 			tokenPath: undefined,
 			tokenSecret: plugin.settings.github.tokenSecret ?? "",
 			api: {

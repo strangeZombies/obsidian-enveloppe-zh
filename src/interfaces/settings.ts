@@ -98,6 +98,8 @@ export interface GitHub {
 	 * If the PR should be automatically merged
 	 */
 	automaticallyMergePR: boolean;
+	/** Combine all file changes from one publishing operation into a single commit. */
+	batchCommit: boolean;
 	/**
 	 * Don't push the changes to the repository, or make any action on the repository
 	 * It will use a local folder instead to mimic the behavior of the plugin

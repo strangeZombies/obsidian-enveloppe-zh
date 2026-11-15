@@ -128,9 +128,30 @@ async function deleteFromGithubOneRepo(
 				pconsole.trace(
 					`trying to delete file : ${file.file} from ${repo.owner}/${repo.repo}`
 				);
-				filesManagement.stageDelete(repo.owner, repo.repo, branchName, file.file);
-				deletedSuccess++;
-				result.deleted.push(file.file);
+				if (settings.github.batchCommit) {
+					filesManagement.stageDelete(repo.owner, repo.repo, branchName, file.file);
+					deletedSuccess++;
+					result.deleted.push(file.file);
+				} else {
+					const response = await octokit.request(
+						"DELETE /repos/{owner}/{repo}/contents/{+path}",
+						{
+							owner: repo.owner,
+							repo: repo.repo,
+							path: file.file,
+							message: `DELETE FILE : ${file.file}`,
+							sha: file.sha,
+							branch: branchName,
+						}
+					);
+					if (response.status === 200) {
+						deletedSuccess++;
+						result.deleted.push(file.file);
+					} else {
+						deletedFailed++;
+						result.undeleted.push(file.file);
+					}
+				}
 			}
 		}
 	}

@@ -1,6 +1,7 @@
 import { GithubTiersVersion } from "@interfaces";
 import { Placeholder } from "@interfaces/enum";
 import i18next from "i18next";
+import { translationLanguage } from "src/i18n/i18next";
 import { SecretComponent, type SettingDefinitionItem } from "obsidian";
 import {
     checkRepositoryValidity,
@@ -11,6 +12,7 @@ import { buildManageRepoPage } from "./manage_repo";
 
 export const buildGithubItems = (ctx: RenderContext): SettingDefinitionItem[] => {
 	const githubSettings = ctx.settings.github;
+	const isChinese = translationLanguage.startsWith("zh");
 
 	const ghTokenDesc = createFragment();
 	ghTokenDesc.createSpan(undefined, (span) => {
@@ -88,6 +90,13 @@ export const buildGithubItems = (ctx: RenderContext): SettingDefinitionItem[] =>
 		{
 			name: i18next.t("settings.github.automaticallyMergePR"),
 			control: { type: "toggle", key: "github.automaticallyMergePR" },
+		},
+		{
+			name: isChinese ? "批量提交文件" : "Batch file commits",
+			desc: isChinese
+				? "开启后，每次发布的笔记、附件和清理操作合并为一个 commit；关闭后恢复逐文件提交。"
+				: "Combine notes, attachments, and cleanup changes from each publish operation into one commit. Turn off to restore one commit per file.",
+			control: { type: "toggle", key: "github.batchCommit" },
 		},
 		{
 			name: i18next.t("settings.github.dryRun.enable.title"),
