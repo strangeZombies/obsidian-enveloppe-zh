@@ -26,6 +26,7 @@ import {
 import { mainConverting } from "src/conversion";
 import { convertToHTMLSVG } from "src/conversion/compiler/excalidraw";
 import { getImagePath, getReceiptFolder } from "src/conversion/file_path";
+import { GithubCommitBatch } from "src/GitHub/commit_batch";
 import { deleteFromGithub } from "src/GitHub/delete";
 import { FilesManagement } from "src/GitHub/files";
 import type { ContentFile } from "src/GitHub/octokit_types";
@@ -60,6 +61,7 @@ export default class Publisher {
 	settings: EnveloppeSettings;
 	branchName: string;
 	console: Logs;
+	protected commitBatch: GithubCommitBatch;
 	noticeLength?: number;
 
 	/**
@@ -68,12 +70,17 @@ export default class Publisher {
 	 * @param {Enveloppe} plugin Enveloppe instance
 	 */
 
-	constructor(octokit: Octokit, plugin: Enveloppe) {
+	constructor(
+		octokit: Octokit,
+		plugin: Enveloppe,
+		commitBatch?: GithubCommitBatch
+	) {
 		this.vault = plugin.app.vault;
 		this.metadataCache = plugin.app.metadataCache;
 		this.settings = plugin.settings;
 		this.octokit = octokit;
 		this.plugin = plugin;
+		this.commitBatch = commitBatch ?? new GithubCommitBatch(octokit);
 		this.branchName = plugin.branchName;
 		this.console = plugin.console;
 		this.noticeLength = this.settings.plugin.noticeLength;
@@ -177,7 +184,7 @@ export default class Publisher {
 		deepScan: boolean = false,
 		sourceFrontmatter: FrontMatterCache | null | undefined
 	) {
-		const shareFiles = new FilesManagement(this.octokit, this.plugin);
+		const shareFiles = new FilesManagement(this.octokit, this.plugin, this.commitBatch);
 		let frontmatter = frontmatterFromFile(file, this.plugin, null);
 		const filePath = getReceiptFolder(
 			file,
@@ -405,20 +412,9 @@ export default class Publisher {
 			throw new Error("Config error : missing GitHub username in the plugin settings");
 		}
 		const octokit = this.octokit;
-		let msg = `PUSH NOTE : ${title}`;
 		if (isAttachment(path, this.settings.embed.unHandledObsidianExt)) {
 			title = path.split("/")[path.split("/").length - 1];
-			msg = `PUSH ATTACHMENT : ${title}`;
 		}
-		const payload = {
-			owner: prop.owner,
-			repo: prop.repo,
-			path,
-			message: `Adding ${title}`,
-			content,
-			sha: "",
-			branch: this.branchName,
-		};
 		const result: UploadedFiles = {
 			isUpdated: false,
 			file: title,
@@ -434,16 +430,35 @@ export default class Publisher {
 				}
 			)) as { status: number; data: ContentFile };
 			if (response.status === 200 && response.data.type === "file") {
-				payload.sha = response.data.sha;
 				result.isUpdated = true;
 			}
 		} catch {
 			this.console.trace(i18next.t("error.normal"));
 		}
 
-		payload.message = msg;
-		await octokit.request("PUT /repos/{owner}/{repo}/contents/{+path}", payload);
+		this.commitBatch.stageFile(
+			prop.owner,
+			prop.repo,
+			this.branchName,
+			path,
+			content
+		);
 		return result;
+	}
+
+	/**
+	 * Queue a delete so it is included in the next batch commit.
+	 */
+	stageDelete(owner: string, repo: string, branchName: string, path: string): void {
+		this.commitBatch.stageDelete(owner, repo, branchName, path);
+	}
+
+	/**
+	 * Commit all queued file changes for one target repository.
+	 */
+	async flushPendingChanges(prop: Properties): Promise<void> {
+		if (!prop.owner || !prop.repo) return;
+		await this.commitBatch.commit(prop.owner, prop.repo, this.branchName);
 	}
 
 	/**

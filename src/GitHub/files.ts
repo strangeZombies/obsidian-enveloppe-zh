@@ -16,6 +16,7 @@ import {
 } from "obsidian";
 import { getAPI, Link } from "obsidian-dataview";
 import { getImagePath, getReceiptFolder } from "src/conversion/file_path";
+import type { GithubCommitBatch } from "src/GitHub/commit_batch";
 import Publisher from "src/GitHub/upload";
 import type Enveloppe from "src/main";
 import { isAttachment, isShared } from "src/utils/data_validation_test";
@@ -33,8 +34,12 @@ export class FilesManagement extends Publisher {
 	 */
 	console: Logs;
 
-	constructor(octokit: Octokit, plugin: Enveloppe) {
-		super(octokit, plugin);
+	constructor(
+		octokit: Octokit,
+		plugin: Enveloppe,
+		commitBatch?: GithubCommitBatch
+	) {
+		super(octokit, plugin, commitBatch);
 		this.console = plugin.console;
 	}
 

@@ -232,6 +232,7 @@ export class GithubBranch extends FilesManagement {
 	async updateRepositoryOnOne(prop: Properties): Promise<boolean> {
 		if (this.settings.github.dryRun.enable) return true;
 		try {
+			await this.flushPendingChanges(prop);
 			const pullRequest = await this.pullRequestOnRepo(prop);
 			if (pullRequest === 0) return false;
 			if (prop.automaticallyMergePR && pullRequest !== 0) {
